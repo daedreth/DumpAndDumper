@@ -1,6 +1,7 @@
 #include <3ds.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "main.h"
 
 int main(int argc, char **argv)
@@ -86,48 +87,38 @@ s8 openArchives()
  return 0;
 }
 
+s8 dumpExtdataSingle(extFile *file, const char *fileName, FS_Archive archive, FS_Archive newArchive)
+{
+	file->ret = FSUSER_OpenFile(&file->handle, archive, fsMakePath(PATH_ASCII, fileName), FS_OPEN_READ, 0);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	file->ret = FSFILE_GetSize(file->handle, &file->size);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	file->data = malloc(file->size);
+	file->ret = FSFILE_Read(file->handle, &file->bytes, 0, file->data, file->size);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	FSFILE_Close(file->handle);
+	
+	char *newPath = malloc(128);
+	strcat(newPath, "/DumpAndDumper");
+	strcat(newPath, fileName);
+	file->ret = FSUSER_CreateFile(newArchive, fsMakePath(PATH_ASCII, newPath), 0, file->size);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	file->ret = FSUSER_OpenFile(&file->handle, newArchive, fsMakePath(PATH_ASCII, newPath), FS_OPEN_WRITE, 0);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	file->ret = FSFILE_Write(file->handle, &file->bytes, 0, file->data, file->size, FS_WRITE_FLUSH);
+	if(R_FAILED(file->ret)) return R_SUMMARY(file->ret);
+	FSFILE_Close(file->handle);
+	
+ return 0;
+}
+
 s8 dumpExtdata()
 {
 
 	extFile bodyCache, bgmCache, themeManage, saveData;
 
-	bodyCache.ret = FSUSER_OpenFile(&bodyCache.handle, ArchiveThemeExt, fsMakePath(PATH_ASCII, "/BodyCache.bin"), FS_OPEN_READ, 0);
-	if(R_FAILED(bodyCache.ret)) return R_SUMMARY(bodyCache.ret);
-	bodyCache.ret = FSFILE_GetSize(bodyCache.handle, &bodyCache.size);
-	if(R_FAILED(bodyCache.ret)) return R_SUMMARY(bodyCache.ret);
-	bodyCache.data = malloc(bodyCache.size);
-	bodyCache.ret = FSFILE_Read(bodyCache.handle, &bodyCache.bytes, 0, bodyCache.data, bodyCache.size);
-	if(R_FAILED(bodyCache.ret)) return R_SUMMARY(bodyCache.ret);
-	FSFILE_Close(bodyCache.handle);
-	
-	bgmCache.ret = FSUSER_OpenFile(&bgmCache.handle, ArchiveThemeExt, fsMakePath(PATH_ASCII, "/BgmCache.bin"), FS_OPEN_READ, 0);
-	if(R_FAILED(bgmCache.ret)) return R_SUMMARY(bgmCache.ret);
-	bgmCache.ret = FSFILE_GetSize(bgmCache.handle, &bgmCache.size);
-	if(R_FAILED(bgmCache.ret)) return R_SUMMARY(bgmCache.ret);
-	bgmCache.data = malloc(bgmCache.size);
-	bgmCache.ret = FSFILE_Read(bgmCache.handle, &bgmCache.bytes, 0, bgmCache.data, bgmCache.size);
-	if(R_FAILED(bgmCache.ret)) return R_SUMMARY(bgmCache.ret);
-	FSFILE_Close(bgmCache.handle);
-
-	themeManage.ret = FSUSER_OpenFile(&themeManage.handle, ArchiveThemeExt, fsMakePath(PATH_ASCII, "/ThemeManage.bin"), FS_OPEN_READ, 0);
-	if(R_FAILED(themeManage.ret)) return R_SUMMARY(themeManage.ret);
-	themeManage.ret = FSFILE_GetSize(themeManage.handle, &themeManage.size);
-	if(R_FAILED(themeManage.ret)) return R_SUMMARY(themeManage.ret);
-	themeManage.data = malloc(themeManage.size);
-	themeManage.ret = FSFILE_Read(themeManage.handle, &themeManage.bytes, 0, themeManage.data, themeManage.size);
-	if(R_FAILED(themeManage.ret)) return R_SUMMARY(themeManage.ret);
-	FSFILE_Close(themeManage.handle);
-
-	saveData.ret = FSUSER_OpenFile(&saveData.handle, ArchiveHomeExt, fsMakePath(PATH_ASCII, "/SaveData.dat"), FS_OPEN_READ, 0);
-	if(R_FAILED(saveData.ret)) return R_SUMMARY(saveData.ret);
-	saveData.ret = FSFILE_GetSize(saveData.handle, &saveData.size);
-	if(R_FAILED(saveData.ret)) return R_SUMMARY(saveData.ret);
-	saveData.data = malloc(saveData.size);
-	saveData.ret = FSFILE_Read(saveData.handle, &saveData.bytes, 0, saveData.data, saveData.size);
-	if(R_FAILED(saveData.ret)) return R_SUMMARY(saveData.ret);
-	FSFILE_Close(saveData.handle);
-
 	Result retValue;
+
 	FSUSER_DeleteDirectoryRecursively(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper"));
 	retValue = FSUSER_CreateDirectory(ArchiveSD, fsMakePath(PATH_ASCII,"/DumpAndDumper") , FS_ATTRIBUTE_DIRECTORY);
 	if(R_FAILED(retValue))
@@ -135,38 +126,12 @@ s8 dumpExtdata()
 		FSUSER_DeleteDirectoryRecursively(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper"));
 		FSUSER_CreateDirectory(ArchiveSD, fsMakePath(PATH_ASCII,"/DumpAndDumper") , FS_ATTRIBUTE_DIRECTORY);
 	}
-	
-	retValue = FSUSER_CreateFile(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/BodyCache.bin"), 0, bodyCache.size);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSUSER_OpenFile(&bodyCache.handle, ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/BodyCache.bin"), FS_OPEN_WRITE, 0);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSFILE_Write(bodyCache.handle, &bodyCache.bytes, 0, bodyCache.data, bodyCache.size, FS_WRITE_FLUSH);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	FSFILE_Close(bodyCache.handle);
-	
-	retValue = FSUSER_CreateFile(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/BgmCache.bin"), 0, bgmCache.size);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSUSER_OpenFile(&bgmCache.handle, ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/BgmCache.bin"), FS_OPEN_WRITE, 0);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSFILE_Write(bgmCache.handle, &bgmCache.bytes, 0, bgmCache.data, bgmCache.size, FS_WRITE_FLUSH);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	FSFILE_Close(bgmCache.handle);
 
-	retValue = FSUSER_CreateFile(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/ThemeManage.bin"), 0, themeManage.size);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSUSER_OpenFile(&themeManage.handle, ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/ThemeManage.bin"), FS_OPEN_WRITE, 0);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSFILE_Write(themeManage.handle, &themeManage.bytes, 0, themeManage.data, themeManage.size, FS_WRITE_FLUSH);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	FSFILE_Close(themeManage.handle);
+	dumpExtdataSingle(&bodyCache, "/BodyCache.bin", ArchiveThemeExt, ArchiveSD);
+	dumpExtdataSingle(&bgmCache, "/BgmCache.bin", ArchiveThemeExt, ArchiveSD);
+	dumpExtdataSingle(&themeManage, "/ThemeManage.bin", ArchiveThemeExt, ArchiveSD);
+	dumpExtdataSingle(&saveData, "/SaveData.dat", ArchiveHomeExt, ArchiveSD);
 	
-	retValue = FSUSER_CreateFile(ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/SaveData.dat"), 0, saveData.size);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSUSER_OpenFile(&saveData.handle, ArchiveSD, fsMakePath(PATH_ASCII, "/DumpAndDumper/SaveData.dat"), FS_OPEN_WRITE, 0);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	retValue = FSFILE_Write(saveData.handle, &saveData.bytes, 0, saveData.data, saveData.size, FS_WRITE_FLUSH);
-	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
-	FSFILE_Close(saveData.handle);
 
 	retValue = FSUSER_CloseArchive(ArchiveSD);
 	if(R_FAILED(retValue)) return R_SUMMARY(retValue);
